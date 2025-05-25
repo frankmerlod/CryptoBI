@@ -73,22 +73,6 @@ def obtener_transacciones(par, moneda_id, intervalo='1d'):
 
     return datos
 
-# Simulamos métricas extra (ya que Binance no ofrece supply ni sentimiento)
-def generar_metricas_dummy(moneda_id, fechas):
-    metricas = []
-    for fecha in fechas:
-        metricas.append({
-            'moneda_id': moneda_id,
-            'fecha': fecha,
-            'total_supply': None,
-            'circulating_supply': None,
-            'max_supply': None,
-            'sentiment_score': None,
-            'cambio_24h': None,
-            'cambio_7d': None
-        })
-    return metricas
-
 # =====================
 #  EJECUCIÓN PRINCIPAL
 # =====================
@@ -103,12 +87,8 @@ for _, moneda in monedas_df.iterrows():
     transac = obtener_transacciones(moneda['binance_id'], moneda['id'])
     transacciones.extend(transac)
 
-    fechas = [t['fecha'] for t in transac]
-    metricas.extend(generar_metricas_dummy(moneda['id'], fechas))
-
 # Guardar a CSV
 monedas_df[['id', 'binance_id', 'nombre', 'simbolo', 'categoria', 'fecha_lanzamiento']].to_csv('monedas.csv', index=False)
 pd.DataFrame(transacciones).to_csv('transacciones_moneda.csv', index=False)
-pd.DataFrame(metricas).to_csv('metricas_extra.csv', index=False)
 
 print("✅ Archivos CSV generados exitosamente.")
