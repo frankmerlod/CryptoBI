@@ -7,8 +7,7 @@ import os
 load_dotenv()
 
 # Tu API Key de Binance (solo lectura)
-API_KEY = os.getenv('BINANCE_KEY')
-coingecko_id= API_KEY
+API_KEY = os.getenv('API_KEY')
 
 # Lista de monedas con sus IDs de CoinGecko
 monedas = [
@@ -36,9 +35,13 @@ monedas = [
 
 def obtener_metricas_coingecko(coingecko_id, intentos=10):
     url = f"https://api.coingecko.com/api/v3/coins/{coingecko_id}"
+    headers = {
+    "x-cg-api-key": API_KEY
+    }
+
     for intento in range(1, intentos + 1):
         try:
-            response = requests.get(url)
+            response = requests.get(url, headers=headers)
             if response.status_code == 200:
                 data = response.json()
                 market_data = data.get("market_data", {})
@@ -86,5 +89,5 @@ for moneda in monedas:
     
 # Guardar las métricas en un archivo CSV
 df_metricas = pd.DataFrame(metricas)
-df_metricas.to_csv("metricas_extra.csv", mode='a', index=False)
+df_metricas.to_csv("metricas_extra.csv", index=False)
 print("Archivo 'metricas_extra.csv' generado exitosamente.")
