@@ -148,7 +148,7 @@ monedas_base = [
 ]
 
 
-def obtener_fecha_inicio_binance(par, intervalo="1d"):
+def obtener_fecha_inicio_binance(par, intervalo="1h"):
     url = "https://api.binance.com/api/v3/klines"
     params = {
         "symbol": par,
@@ -172,54 +172,57 @@ def obtener_fecha_inicio_binance(par, intervalo="1d"):
 
 
 # Función para obtener datos históricos OHLCV
-def obtener_transacciones(par, moneda_id, fecha_inicio_str, intervalo="1d"):
+def obtener_transacciones(par, moneda_id, fecha_inicio_str, intervalo="1h"):
     url = "https://api.binance.com/api/v3/klines"
     datos = []
 
-    # Parsear fecha lanzamiento a datetime
-    start_date = datetime.strptime(fecha_inicio_str, "%Y-%m-%d")
-    now = datetime.now()
+    try:
+        start_date = datetime.strptime(fecha_inicio_str, "%Y-%m-%d")
+        now = datetime.now()
 
-    while start_date < now:
-        start_ms = int(start_date.timestamp() * 1000)
-        end_ms = int((start_date + timedelta(days=1000)).timestamp() * 1000)
+        while start_date < now:
+            start_ms = int(start_date.timestamp() * 1000)
+            params = {
+                "symbol": par,
+                "interval": intervalo,
+                "startTime": start_ms,
+                "limit": 1000,
+            }
 
-        params = {
-            "symbol": par,
-            "interval": intervalo,
-            "startTime": start_ms,
-            "endTime": end_ms,
-            "limit": 1000,
-        }
+            response = requests.get(url, params=params)
+            if response.status_code != 200:
+                print(f"Error con {par}: {response.text}")
+                break
 
-        response = requests.get(url, params=params)
-        if response.status_code != 200:
-            print(f"Error con {par}: {response.text}")
-            break
+            candles = response.json()
+            if not candles:
+                break
 
-        candles = response.json()
-        if not candles:
-            break
+            for c in candles:
+                datos.append(
+                    {
+                        "moneda_id": moneda_id,
+                        "fecha": datetime.fromtimestamp(c[0] / 1000),
+                        "precio_apertura": float(c[1]),
+                        "precio_max": float(c[2]),
+                        "precio_min": float(c[3]),
+                        "precio_cierre": float(c[4]),
+                        "volumen": float(c[5]),
+                        "precio": float(c[4]),
+                        "market_cap": None,
+                    }
+                )
 
-        for c in candles:
-            datos.append(
-                {
-                    "moneda_id": moneda_id,
-                    "fecha": datetime.fromtimestamp(c[0] / 1000),
-                    "precio_apertura": float(c[1]),
-                    "precio_max": float(c[2]),
-                    "precio_min": float(c[3]),
-                    "precio_cierre": float(c[4]),
-                    "volumen": float(c[5]),
-                    "precio": float(c[4]),  # Usamos cierre como "precio"
-                    "market_cap": None,
-                }
-            )
+            # Avanzar al siguiente batch de datos
+            last_timestamp = candles[-1][0]
+            start_date = datetime.fromtimestamp((last_timestamp + 1) / 1000)
 
-        start_date += timedelta(days=1000)
-        time.sleep(1)
+            time.sleep(1)
 
-    return datos
+    except Exception as e:
+        print(f"❌ Error inesperado para {par}: {e}")
+
+    return datos  # <- SIEMPRE retorna una lista (aunque sea vacía)
 
 
 # =====================
@@ -235,13 +238,16 @@ for _, moneda in monedas_df.iterrows():
     print(f"Obteniendo fecha de inicio real en Binance para {moneda['binance_id']}...")
     fecha_inicio_real = obtener_fecha_inicio_binance(moneda["binance_id"])
     if not fecha_inicio_real:
-        fecha_inicio_real = moneda["fecha_lanzamiento"]  # fallback
+        fecha_inicio_real = moneda["fecha_lanzamiento"]
 
     print(f"Procesando {moneda['binance_id']} desde {fecha_inicio_real}...")
     transac = obtener_transacciones(
         moneda["binance_id"], moneda["id"], fecha_inicio_real
     )
-    transacciones.extend(transac)
+    if transac:
+        transacciones.extend(transac)
+    else:
+        print(f"⚠️ No se encontraron transacciones para {moneda['binance_id']}")
 
 
 # Guardar a CSV

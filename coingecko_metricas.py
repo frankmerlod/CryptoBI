@@ -92,7 +92,7 @@ for moneda in monedas:
                 "cambio_7d": datos["cambio_7d"],
             }
         )
-    time.sleep(2.5)
+    time.sleep(5)
 
 # Guardar las métricas en un archivo CSV
 df_metricas = pd.DataFrame(metricas)
