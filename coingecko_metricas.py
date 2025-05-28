@@ -22,7 +22,7 @@ monedas = [
     {"id": 8, "binance_id": "AVAXUSDT", "coingecko_id": "avalanche-2"},
     {"id": 9, "binance_id": "DOTUSDT", "coingecko_id": "polkadot"},
     {"id": 10, "binance_id": "TRXUSDT", "coingecko_id": "tron"},
-    {"id": 11, "binance_id": "MATICUSDT", "coingecko_id": "polygon"},
+    {"id": 11, "binance_id": "MATICUSDT", "coingecko_id": "matic-network"},
     {"id": 12, "binance_id": "LINKUSDT", "coingecko_id": "chainlink"},
     {"id": 13, "binance_id": "LTCUSDT", "coingecko_id": "litecoin"},
     {"id": 14, "binance_id": "ATOMUSDT", "coingecko_id": "cosmos"},
@@ -53,7 +53,7 @@ def obtener_metricas_coingecko(coingecko_id, intentos=10):
                     "cambio_7d": market_data.get("price_change_percentage_7d"),
                 }
             elif response.status_code == 429:
-                wait_time = 5 * intento
+                wait_time = 15 * intento
                 print(f"[429] Demasiadas solicitudes. Reintentando en {wait_time}s...")
                 time.sleep(wait_time)
             else:
@@ -92,7 +92,7 @@ for moneda in monedas:
                 "cambio_7d": datos["cambio_7d"],
             }
         )
-    time.sleep(5)
+    time.sleep(10)
 
 # Guardar las métricas en un archivo CSV
 df_metricas = pd.DataFrame(metricas)
