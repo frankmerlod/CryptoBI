@@ -12,7 +12,7 @@ CREATE TABLE monedas (
 )
 
 CREATE TABLE transacciones_moneda (
-    id INT IDENTITY(1,1) PRIMARY KEY,
+    id INT PRIMARY KEY,
     moneda_id INTEGER REFERENCES monedas(id),
     fecha DATETIME,
     precio NUMERIC(30, 10),
@@ -25,7 +25,7 @@ CREATE TABLE transacciones_moneda (
 )
 
 CREATE TABLE metricas_extra (
-    id INT IDENTITY(1,1) PRIMARY KEY,
+    id INT PRIMARY KEY,
     moneda_id INTEGER REFERENCES monedas(id),
     fecha DATETIME,
     total_supply DECIMAL(30, 10),
@@ -36,5 +36,4 @@ CREATE TABLE metricas_extra (
     cambio_7d DECIMAL(10,4)
 )
 
-SELECT * FROM transacciones_moneda;
-DROP DATABASE CryptoBI
+SELECT * FROM transacciones_moneda WHERE moneda_id = 1;

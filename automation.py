@@ -24,18 +24,20 @@ def get_connection():
 
 def verificar_datos_nuevos(df, nombre_tabla):
     engine = get_connection()
-    # Filtrando el df para cargar solamente datos nuevos
     print(f"🗄️ 🔍 Buscando nuevos registros en el Dataframe")
-    consulta = f"""
-    SELECT COLUMN_NAME 
-    FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
-    WHERE TABLE_NAME = '{nombre_tabla}';
-    """
-    resultado = pd.read_sql(consulta, engine)
-    resultado = resultado["COLUMN_NAME"].iloc[0] if not resultado.empty else None
-    ids_existentes = pd.read_sql(f"SELECT {resultado} FROM {nombre_tabla}", engine)
-    ids_set = set(ids_existentes[resultado])
-    df_nuevos = df[~df[resultado].isin(ids_set)]
+
+    # Leer los ids existentes en la base de datos
+    ids_existentes_df = pd.read_sql(f"SELECT id FROM {nombre_tabla}", engine)
+
+    if ids_existentes_df.empty:
+        print("📭 No hay registros existentes en la tabla. Se insertarán todos los datos.")
+        return df.copy()
+
+    # Filtramos los registros nuevos
+    ids_existentes = set(ids_existentes_df['id'])
+    df_nuevos = df[~df['id'].isin(ids_existentes)].copy()
+
+    print(f"🆕 Registros nuevos detectados: {len(df_nuevos)}")
     return df_nuevos
 
 def cargar_a_sql(df, nombre_tabla):
@@ -45,7 +47,7 @@ def cargar_a_sql(df, nombre_tabla):
         df_nuevos = verificar_datos_nuevos(df, nombre_tabla)
         if len(df_nuevos) > 0:
             df_nuevos.to_sql(nombre_tabla, con=engine, if_exists='append', index=False)
-            print(f"🗄️ ✅ Datos cargados a la tabla {nombre_tabla}\n")
+            print(f"🗄️ ✅ Se cargaron {len(df_nuevos)} registros a la tabla {nombre_tabla}\n")
         else:
             print(f"🗄️ ❌ No hay nuevos registros para agregar en la tabla {nombre_tabla}\n")
     except SQLAlchemyError as e:
@@ -341,12 +343,12 @@ if __name__ == '__main__':
     transacciones = []
     
     for _, moneda in monedas_df.iterrows():
-        print(f"Obteniendo fecha de inicio real en Binance para {moneda['binance_id']}...")
+        print(f"Obteniendo fecha de inicio real en Binance para {moneda['binance_id']}... 🗄️ 🔍")
         fecha_inicio_real = obtener_fecha_inicio_binance(moneda["binance_id"])
         if not fecha_inicio_real:
             fecha_inicio_real = moneda["fecha_lanzamiento"]
 
-        print(f"Procesando {moneda['binance_id']} desde {fecha_inicio_real}...")
+        print(f"Procesando {moneda['binance_id']} desde {fecha_inicio_real}... 🗄️ 🟢")
         transac = obtener_transacciones(
             moneda["binance_id"], moneda["id"], fecha_inicio_real
         )
@@ -359,7 +361,7 @@ if __name__ == '__main__':
     metricas = []
 
     for moneda in monedas_base:
-        print(f"Obteniendo métricas para {moneda['coingecko_id']}...")
+        print(f"Obteniendo métricas en Coingecko para {moneda['coingecko_id']}... 🗄️ 🔍")
         datos = obtener_metricas_coingecko(moneda["coingecko_id"])
         if datos:
             metricas.append(
@@ -374,13 +376,16 @@ if __name__ == '__main__':
                     "cambio_7d": datos["cambio_7d"],
                 }
             )
+            print(f"{moneda['coingecko_id']}... 🗄️ 🟢")
         time.sleep(10)
 
     # Guardar las transacciones y métricas en un archivo CSV
     df_metricas = pd.DataFrame(metricas)
+    df_metricas["id"] = df_metricas.index + 1
     df_transacciones = pd.DataFrame(transacciones)
+    df_transacciones["id"] = df_transacciones.index + 1
     print("✅ Archivos CSV generados exitosamente.")
-
+        
     # Cargar a SQL Server
     tablas = [('monedas', monedas_df), ('transacciones_moneda', df_transacciones), ('metricas_extra', df_metricas)]
     for tabla in tablas:
