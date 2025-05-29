@@ -12,6 +12,7 @@ load_dotenv()
 API_KEY = os.getenv("API_KEY")
 SERVER = 'localhost\\SQLEXPRESS'
 DATABASE = 'CryptoBI'
+DIRECTORY= './data/csv' 
 
 
 # conexion y carga a la base de datos
@@ -314,11 +315,11 @@ def obtener_metricas_coingecko(coingecko_id, intentos=10):
                 }
             elif response.status_code == 429:
                 wait_time = 15 * intento
-                print(f"[429] Demasiadas solicitudes. Reintentando en {wait_time}s...")
+                print(f"[429] Demasiadas solicitudes. Reintentando en {wait_time}s ⏳⌛...")
                 time.sleep(wait_time)
             else:
                 print(
-                    f"Error {response.status_code} al obtener datos para {coingecko_id}"
+                    f"Error {response.status_code} al obtener datos para {coingecko_id} ⚠️⚠️"
                 )
                 return None
         except Exception as e:
@@ -329,19 +330,9 @@ def obtener_metricas_coingecko(coingecko_id, intentos=10):
     )
     return None
 
-# =====================
-#  EJECUCIÓN PRINCIPAL
-# =====================
-if __name__ == '__main__':
-    monedas_df = pd.DataFrame(monedas_base)
-    monedas_df["id"] = monedas_df.index + 1  # Simula ID autoincremental
-
-    # Fecha actual
-    fecha_actual = datetime.now().strftime("%Y-%m-%d")
-
-    # Generando trasacciones desde Binance
+def generar_transacciones(df):
+    monedas_df = df.copy()
     transacciones = []
-    
     for _, moneda in monedas_df.iterrows():
         print(f"Obteniendo fecha de inicio real en Binance para {moneda['binance_id']}... 🗄️ 🔍")
         fecha_inicio_real = obtener_fecha_inicio_binance(moneda["binance_id"])
@@ -356,10 +347,13 @@ if __name__ == '__main__':
             transacciones.extend(transac)
         else:
             print(f"⚠️ No se encontraron transacciones para {moneda['binance_id']}")
-            
-    # Generando metricas desde CoinGecko
-    metricas = []
+    return transacciones
 
+def generar_metricas(df):
+    # Fecha actual
+    fecha_actual = datetime.now().strftime("%Y-%m-%d")
+    monedas_df = df.copy()
+    metricas = []
     for moneda in monedas_base:
         print(f"Obteniendo métricas en Coingecko para {moneda['coingecko_id']}... 🗄️ 🔍")
         datos = obtener_metricas_coingecko(moneda["coingecko_id"])
@@ -376,21 +370,79 @@ if __name__ == '__main__':
                     "cambio_7d": datos["cambio_7d"],
                 }
             )
-            print(f"{moneda['coingecko_id']}... 🗄️ 🟢")
+            print(f"Guardando datos de {moneda['coingecko_id']}... 🗄️ 🟢")
         time.sleep(10)
+    return metricas
 
-    # Guardar las transacciones y métricas en un archivo CSV
-    df_metricas = pd.DataFrame(metricas)
-    df_metricas["id"] = df_metricas.index + 1
-    df_transacciones = pd.DataFrame(transacciones)
-    df_transacciones["id"] = df_transacciones.index + 1
-    print("✅ Archivos CSV generados exitosamente.")
+def borrar_data():
+    carpeta = DIRECTORY
+    # Verificamos que la carpeta exista
+    if os.path.exists(carpeta):
+        for nombre in os.listdir(carpeta):
+            ruta_completa = os.path.join(carpeta, nombre)
+            if os.path.isfile(ruta_completa) or os.path.islink(ruta_completa):
+                os.unlink(ruta_completa)  # borra archivos o enlaces simbólicos
+            elif os.path.isdir(ruta_completa):
+                shutil.rmtree(ruta_completa)  # borra subcarpetas
+        print(f"Contenido de {DIRECTORY} eliminado correctamente ✅")
+    else:
+        print(f"La carpeta {DIRECTORY} no existe ⛔")
+
+# =====================
+#  EJECUCIÓN PRINCIPAL
+# =====================
+if __name__ == '__main__':
+    
+    # Verificar si existe el directorio
+    if not os.path.exists(DIRECTORY):
+        os.makedirs(DIRECTORY)
+    
+    if not os.path.exists(f'{DIRECTORY}/monedas.csv'):
+        monedas_df = pd.DataFrame(monedas_base)
+        monedas_df["id"] = monedas_df.index + 1  # Simula ID autoincremental
+        # Guardar las monedas en un archivo CSV
+        monedas_df.to_csv(f'{DIRECTORY}/monedas.csv', index=False)
+        print("✅ Archivo monedas.csv generado exitosamente.")
         
+    # Cargar df
+    monedas_df = pd.read_csv(f'{DIRECTORY}/monedas.csv')
+    print(f"Cargando {DIRECTORY}/monedas.csv como dataframe... 🗄️")
+
+    if not os.path.exists(f'{DIRECTORY}/transacciones_moneda.csv'):
+        # Generando trasacciones desde Binance
+        transacciones = generar_transacciones(monedas_df)
+        df_transacciones = pd.DataFrame(transacciones)
+        df_transacciones["id"] = df_transacciones.index + 1 # Simula ID autoincremental
+        # Guardar las transacciones en un archivo CSV
+        df_transacciones.to_csv(f'{DIRECTORY}/transacciones_moneda.csv', index=False)
+        print("✅ Archivo transacciones_moneda.csv generado exitosamente.")
+        
+    # Cargar df 
+    df_transacciones = pd.read_csv(f'{DIRECTORY}/transacciones_moneda.csv')
+    print(f"Cargando {DIRECTORY}/transacciones_moneda.csv como dataframe... 🗄️")
+    
+    if not os.path.exists(f'{DIRECTORY}/metricas_extra.csv'):        
+        # Generando metricas desde CoinGecko
+        metricas = generar_metricas(monedas_df)
+        df_metricas = pd.DataFrame(metricas)
+        df_metricas["id"] = df_metricas.index + 1 # Simula ID autoincremental
+        # Guardar las métricas en un archivo CSV
+        df_metricas.to_csv(f'{DIRECTORY}/metricas_extra.csv', index=False)
+        print("✅ Archivo metricas_extra.csv generado exitosamente.")
+
+    # Cargar df
+    df_metricas = pd.read_csv(f'{DIRECTORY}/metricas_extra.csv')
+    print(f"Cargando {DIRECTORY}/metricas_extra.csv como dataframe... 🗄️")
+    
     # Cargar a SQL Server
     tablas = [('monedas', monedas_df), ('transacciones_moneda', df_transacciones), ('metricas_extra', df_metricas)]
     for tabla in tablas:
         cargar_a_sql(tabla[1], tabla[0])
     
+    # Borrar los dataset    
+    borrar = input(f'Se borraran los archivos de la carpeta {DIRECTORY}. Deseas continuar? Y/N:')
+    if borrar.lower() == 'y':
+        borrar_data()
 
 
 
