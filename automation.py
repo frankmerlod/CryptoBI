@@ -23,20 +23,41 @@ def get_connection():
     engine = create_engine(connection_string)
     return engine
 
+def verificar_transacciones(df):
+    engine = get_connection()
+    # Leer los ids existentes en la base de datos
+    transacciones_moneda = pd.read_sql(f"SELECT * FROM transacciones_moneda", engine)
+    if transacciones_moneda.empty:
+        print("📭 No hay registros existentes en la tabla. Se insertarán todos los datos.")
+        return df.copy()
+    df_nuevos = pd.DataFrame()
+    ids_existentes = set(transacciones_moneda['id'])
+    for id in transacciones_moneda['moneda_id'].unique():
+        # Filtramos los registros nuevos por cada moneda
+        nuevos_datos = df.loc[df['moneda_id'] == id]
+        nuevos_datos = nuevos_datos[~nuevos_datos['id'].isin(ids_existentes)]
+        if not nuevos_datos.empty:
+            df_nuevos = pd.concat(nuevos_datos)
+    # Agregando nuevos datos a transacciones_monedas     
+    final = pd.concat([transacciones_moneda, df_nuevos], ignore_index=True)
+    # filtrando ids nuevos
+    final = final[~final['id'].isin(ids_existentes)]
+    return final
+
 def verificar_datos_nuevos(df, nombre_tabla):
     engine = get_connection()
     print(f"🗄️ 🔍 Buscando nuevos registros en el Dataframe")
-
-    # Leer los ids existentes en la base de datos
-    ids_existentes_df = pd.read_sql(f"SELECT id FROM {nombre_tabla}", engine)
-
-    if ids_existentes_df.empty:
-        print("📭 No hay registros existentes en la tabla. Se insertarán todos los datos.")
-        return df.copy()
-
-    # Filtramos los registros nuevos
-    ids_existentes = set(ids_existentes_df['id'])
-    df_nuevos = df[~df['id'].isin(ids_existentes)].copy()
+    if nombre_tabla == 'transacciones_moneda':
+        df_nuevos = verificar_transacciones(df)
+    else:
+        # Leer los ids existentes en la base de datos
+        ids_existentes_df = pd.read_sql(f"SELECT id FROM {nombre_tabla}", engine)
+        if ids_existentes_df.empty:
+            print("📭 No hay registros existentes en la tabla. Se insertarán todos los datos.")
+            return df.copy()
+        # Filtramos los registros nuevos
+        ids_existentes = set(ids_existentes_df['id'])
+        df_nuevos = df[~df['id'].isin(ids_existentes)].copy()
 
     print(f"🆕 Registros nuevos detectados: {len(df_nuevos)}")
     return df_nuevos
@@ -434,15 +455,27 @@ if __name__ == '__main__':
     df_metricas = pd.read_csv(f'{DIRECTORY}/metricas_extra.csv')
     print(f"Cargando {DIRECTORY}/metricas_extra.csv como dataframe... 🗄️")
     
-    # Cargar a SQL Server
-    tablas = [('monedas', monedas_df), ('transacciones_moneda', df_transacciones), ('metricas_extra', df_metricas)]
-    for tabla in tablas:
-        cargar_a_sql(tabla[1], tabla[0])
-    
-    # Borrar los dataset    
-    borrar = input(f'Se borraran los archivos de la carpeta {DIRECTORY}. Deseas continuar? Y/N:')
-    if borrar.lower() == 'y':
-        borrar_data()
+    try:
+        # Cargar a SQL Server
+        tablas = [('monedas', monedas_df), ('transacciones_moneda', df_transacciones), ('metricas_extra', df_metricas)]
+        for tabla in tablas:
+            cargar_a_sql(tabla[1], tabla[0])
+        # Borrar los dataset   
+        while True: 
+            borrar = input(f'⚠️ ⚠️  Eliminar los archivos de la carpeta {DIRECTORY}. Deseas continuar? Y/N:')
+            if borrar.lower() == 'y':
+                borrar_data()
+                break
+            elif borrar.lower() == 'n':
+                print(f'No serán eliminados los archivos, pero en la próxima ejecución del script no se descargará nueva data... ⛔')
+                break
+            else:
+                print('Debes ingresar Y ó N')
+    except Exception as e:
+        print('Error en el proceso de carga a la base de datos ⛔ ⚠️')
+        print(f'Error: {e}')
+    finally:
+        print('Ejecución Terminada 🤖')
 
 
 
