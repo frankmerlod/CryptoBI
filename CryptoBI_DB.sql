@@ -5,6 +5,7 @@ USE CryptoBI;
 CREATE TABLE monedas (
     id INT PRIMARY KEY,
     binance_id NVARCHAR(20) UNIQUE, -- por ej: 'BTCUSDT' 
+	coingecko_id NVARCHAR(20),
     nombre NVARCHAR(20),
     simbolo NVARCHAR(20),
     categoria NVARCHAR(20),

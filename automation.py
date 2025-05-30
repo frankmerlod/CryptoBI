@@ -375,13 +375,13 @@ def generar_metricas(df):
     fecha_actual = datetime.now().strftime("%Y-%m-%d")
     monedas_df = df.copy()
     metricas = []
-    for moneda in monedas_base:
+    for index, moneda in monedas_df.iterrows():
         print(f"Obteniendo métricas en Coingecko para {moneda['coingecko_id']}... 🗄️ 🔍")
         datos = obtener_metricas_coingecko(moneda["coingecko_id"])
         if datos:
             metricas.append(
                 {
-                    "moneda_id": monedas_df['id'].loc[monedas_df['coingecko_id'] == moneda["coingecko_id"]],
+                    "moneda_id": moneda["id"],
                     "fecha": fecha_actual,
                     "total_supply": datos["total_supply"],
                     "circulating_supply": datos["circulating_supply"],
