@@ -13,67 +13,6 @@ API_KEY = os.getenv("API_KEY")
 SERVER = 'localhost\\SQLEXPRESS'
 DATABASE = 'CryptoBI'
 DIRECTORY= './data/csv' 
-
-
-# conexion y carga a la base de datos
-def get_connection():
-    print(f"🗄️ 🟢 Estableciendo Conexión a la Base de Datos")
-    connection_string = ('mssql+pyodbc://@' + SERVER + '/' + DATABASE + '?trusted_connection=yes&driver=ODBC+Driver+17+for+SQL+Server')
-    # Crear el engine
-    engine = create_engine(connection_string)
-    return engine
-
-def verificar_transacciones(df):
-    engine = get_connection()
-    # Leer los ids existentes en la base de datos
-    transacciones_moneda = pd.read_sql(f"SELECT * FROM transacciones_moneda", engine)
-    if transacciones_moneda.empty:
-        print("📭 No hay registros existentes en la tabla. Se insertarán todos los datos.")
-        return df.copy()
-    df_nuevos = pd.DataFrame()
-    ids_existentes = set(transacciones_moneda['id'])
-    for id in transacciones_moneda['moneda_id'].unique():
-        # Filtramos los registros nuevos por cada moneda
-        nuevos_datos = df.loc[df['moneda_id'] == id]
-        nuevos_datos = nuevos_datos[~nuevos_datos['id'].isin(ids_existentes)]
-        if not nuevos_datos.empty:
-            df_nuevos = pd.concat(nuevos_datos)
-    # Agregando nuevos datos a transacciones_monedas     
-    final = pd.concat([transacciones_moneda, df_nuevos], ignore_index=True)
-    # filtrando ids nuevos
-    final = final[~final['id'].isin(ids_existentes)]
-    return final
-
-def verificar_datos_nuevos(df, nombre_tabla):
-    engine = get_connection()
-    print(f"🗄️ 🔍 Buscando nuevos registros en el Dataframe")
-    if nombre_tabla == 'transacciones_moneda':
-        df_nuevos = verificar_transacciones(df)
-    else:
-        # Leer los ids existentes en la base de datos
-        ids_existentes_df = pd.read_sql(f"SELECT id FROM {nombre_tabla}", engine)
-        if ids_existentes_df.empty:
-            print("📭 No hay registros existentes en la tabla. Se insertarán todos los datos.")
-            return df.copy()
-        # Filtramos los registros nuevos
-        ids_existentes = set(ids_existentes_df['id'])
-        df_nuevos = df[~df['id'].isin(ids_existentes)].copy()
-
-    print(f"🆕 Registros nuevos detectados: {len(df_nuevos)}")
-    return df_nuevos
-
-def cargar_a_sql(df, nombre_tabla):
-    try:
-        engine = get_connection()
-        # Verificar si existen nuevos registros
-        df_nuevos = verificar_datos_nuevos(df, nombre_tabla)
-        if len(df_nuevos) > 0:
-            df_nuevos.to_sql(nombre_tabla, con=engine, if_exists='append', index=False)
-            print(f"🗄️ ✅ Se cargaron {len(df_nuevos)} registros a la tabla {nombre_tabla}\n")
-        else:
-            print(f"🗄️ ❌ No hay nuevos registros para agregar en la tabla {nombre_tabla}\n")
-    except SQLAlchemyError as e:
-        print(f'Error en la Base de datos: {e}')
         
 
 # Top 20 monedas (pares con USDT en Binance)
@@ -240,6 +179,68 @@ monedas_base = [
     },
 ]
 
+
+# conexion y carga a la base de datos
+def get_connection():
+    print(f"🗄️ 🟢 Estableciendo Conexión a la Base de Datos")
+    connection_string = ('mssql+pyodbc://@' + SERVER + '/' + DATABASE + '?trusted_connection=yes&driver=ODBC+Driver+17+for+SQL+Server')
+    # Crear el engine
+    engine = create_engine(connection_string)
+    return engine
+
+def verificar_transacciones(df):
+    engine = get_connection()
+    # Leer los ids existentes en la base de datos
+    transacciones_moneda = pd.read_sql(f"SELECT * FROM transacciones_moneda", engine)
+    if transacciones_moneda.empty:
+        print("📭 No hay registros existentes en la tabla. Se insertarán todos los datos.")
+        return df.copy()
+    df_nuevos = pd.DataFrame()
+    ids_existentes = set(transacciones_moneda['id'])
+    for id in transacciones_moneda['moneda_id'].unique():
+        # Filtramos los registros nuevos por cada moneda
+        nuevos_datos = df.loc[df['moneda_id'] == id]
+        nuevos_datos = nuevos_datos[~nuevos_datos['id'].isin(ids_existentes)]
+        if not nuevos_datos.empty:
+            df_nuevos = pd.concat([nuevos_datos])
+    # Agregando nuevos datos a transacciones_monedas     
+    final = pd.concat([transacciones_moneda, df_nuevos], ignore_index=True)
+    # filtrando ids nuevos
+    final = final[~final['id'].isin(ids_existentes)]
+    return final
+
+def verificar_datos_nuevos(df, nombre_tabla):
+    engine = get_connection()
+    print(f"🗄️ 🔍 Buscando nuevos registros en el Dataframe")
+    if nombre_tabla == 'transacciones_moneda':
+        df_nuevos = verificar_transacciones(df)
+    else:
+        # Leer los ids existentes en la base de datos
+        ids_existentes_df = pd.read_sql(f"SELECT id FROM {nombre_tabla}", engine)
+        if ids_existentes_df.empty:
+            print("📭 No hay registros existentes en la tabla. Se insertarán todos los datos.")
+            return df.copy()
+        # Filtramos los registros nuevos
+        ids_existentes = set(ids_existentes_df['id'])
+        df_nuevos = df[~df['id'].isin(ids_existentes)].copy()
+
+    print(f"🆕 Registros nuevos detectados: {len(df_nuevos)}")
+    return df_nuevos
+
+def cargar_a_sql(df, nombre_tabla):
+    try:
+        engine = get_connection()
+        # Verificar si existen nuevos registros
+        df_nuevos = verificar_datos_nuevos(df, nombre_tabla)
+        if len(df_nuevos) > 0:
+            df_nuevos.to_sql(nombre_tabla, con=engine, if_exists='append', index=False)
+            print(f"🗄️ ✅ Se cargaron {len(df_nuevos)} registros a la tabla {nombre_tabla}\n")
+        else:
+            print(f"🗄️ ❌ No hay nuevos registros para agregar en la tabla {nombre_tabla}\n")
+    except SQLAlchemyError as e:
+        print(f'Error en la Base de datos: {e}')
+        
+        
 # Verificar desde donde hay registros de la moneda en Binance
 def obtener_fecha_inicio_binance(par, intervalo="1h"):
     url = "https://api.binance.com/api/v3/klines"
